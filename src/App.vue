@@ -155,7 +155,7 @@ function stop() {
 
 <template>
   <Teleport to="body">
-    <Draggable v-slot="{ x, y }" :prevent-default="true" :initial-value="{ x: innerWidth - 320, y: 0 }"
+    <Draggable v-slot="{ x, y }" :prevent-default="true" :initial-value="{ x: innerWidth - 320, y: 80 }"
       :handle="handleRef" ref='windowRef' flex="~ col" rounded text-sm z-999999 fixed w-80 bg-gray-2 shadow-lg px-5>
 
       <div ref="handleRef" py-3 cursor-grab group>
