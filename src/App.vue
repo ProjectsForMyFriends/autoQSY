@@ -3,27 +3,32 @@ import { onMounted, ref } from 'vue';
 import { useFileDialog } from '@vueuse/core'
 import readXlsxFile from 'read-excel-file'
 import Fuse from 'fuse.js'
-import { useDraggable } from '@vueuse/core'
+import { UseDraggable as Draggable } from '@vueuse/components'
+import { VERSION } from './const'
 
 interface Data {
   question: string
   options: string[]
   answer: string
 }
-type Answer = 'A' | 'B' | 'C' | 'D' | 'E'
+type Answer = 'A' | 'B' | 'C' | 'D' | 'E' | 'F'
 
 const answerToIndex: Record<Answer, number> = {
   'A': 0,
   'B': 1,
   'C': 2,
   'D': 3,
-  'E': 4
+  'E': 4,
+  'F': 5,
 }
 
 const optionsRef = ref<HTMLLabelElement[] | null>(null)
 const nextButton = ref<HTMLButtonElement | null>(null)
 const submitButton = ref<HTMLButtonElement | null>(null)
 const autoSubmit = ref(true)
+const submitDelay = ref(600)
+const nextDelay = ref(100)
+
 let shouldExit = false
 let startFlag = ref(false)
 
@@ -31,9 +36,8 @@ const question = ref<string>('')
 const data = ref<Data[]>([])
 const answer = ref<string>('')
 const windowRef = ref<HTMLElement | null>(null)
-const { style } = useDraggable(windowRef, {
-  initialValue: { x: 960, y: 0 },
-})
+const handleRef = ref<HTMLDivElement | null>(null)
+const innerWidth = window.innerWidth
 
 const { open, onChange } = useFileDialog({
   accept: 'xlsx/*', // Set to accept only image files
@@ -102,7 +106,7 @@ async function getAnswer() {
     await new Promise((resolve) => {
       setTimeout(() => {
         resolve('')
-      }, 300);
+      }, submitDelay.value);
     })
   }
 
@@ -114,7 +118,7 @@ async function getAnswer() {
   await new Promise((resolve) => {
     setTimeout(() => {
       resolve('')
-    }, 100);
+    }, nextDelay.value);
   })
 }
 
@@ -151,19 +155,26 @@ function stop() {
 
 <template>
   <Teleport to="body">
-    <div ref='windowRef' :style="style" flex="~ col" justify-between text-sm z-999999 fixed w-80 h-40 bg-gray700 p-5
-      text-light>
-      <span font-bold text-lg>自动答题脚本 v1.0</span>
-      <div flex gap-2>
-        <button :disabled="data.length !== 0" @click="open()">{{ data.length === 0 ? '导入题库' : '已导入' }}</button>
-        <button :disabled="startFlag" @click="start">开始答题</button>
-        <button :disabled="!startFlag" :class="{ 'text-red': startFlag }" @click="stop">停止</button>
+    <Draggable v-slot="{ x, y }" :prevent-default="true" :initial-value="{ x: innerWidth - 320, y: 0 }"
+      :handle="handleRef" ref='windowRef' flex="~ col" rounded text-sm z-999999 fixed w-80 bg-gray-2 shadow-lg px-5>
+
+      <div ref="handleRef" py-3 cursor-grab group>
+        <div w="3/4" bg=" gray-300" transition-300 h-1.5 rounded-full mx-auto>
+        </div>
       </div>
 
-      <div flex>
-        <input v-model="autoSubmit" type="checkbox" />
-        <p>自动提交</p>
+      <span font-bold text-lg mx-auto>自动答题脚本 v{{ VERSION }}</span>
+
+      <div flex gap-2 my-5>
+        <VBtn :disabled="data.length !== 0" @click="open()">{{ data.length === 0 ? '导入题库' : '已导入' }}</VBtn>
+        <VBtn :disabled="startFlag" @click="start">开始答题</VBtn>
+        <VBtn :disabled="!startFlag" :class="{ 'text-red': startFlag }" @click="stop">停止</VBtn>
       </div>
-    </div>
+
+      <VSlider thumb-label step="100" min="100" max="2000" label="提交延迟" v-model="submitDelay" />
+      <VSlider thumb-label step="50" min="100" max="500" label="切题延迟" v-model="nextDelay" />
+
+      <VSwitch label="自动提交" v-model="autoSubmit" color="primary" />
+    </Draggable>
   </Teleport>
 </template>
