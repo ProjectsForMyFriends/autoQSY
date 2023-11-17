@@ -5,6 +5,7 @@ import readXlsxFile from 'read-excel-file'
 import Fuse from 'fuse.js'
 import { UseDraggable as Draggable } from '@vueuse/components'
 import { VERSION } from './const'
+import { computed } from 'vue';
 
 interface Data {
   question: string
@@ -28,13 +29,18 @@ const submitButton = ref<HTMLButtonElement | null>(null)
 const autoSubmit = ref(true)
 const submitDelay = ref(600)
 const nextDelay = ref(100)
+const optionList = computed(() => {
+  return Array.from(optionsRef.value!).map((item) => {
+    return item.innerText
+  })
+})
 
 let shouldExit = false
 let startFlag = ref(false)
 
 const question = ref<string>('')
 const data = ref<Data[]>([])
-const answer = ref<string>('')
+const dbAnswer = ref<string>('')
 const windowRef = ref<HTMLElement | null>(null)
 const handleRef = ref<HTMLDivElement | null>(null)
 const innerWidth = window.innerWidth
@@ -51,7 +57,6 @@ onChange((files: any) => {
   readXlsxFile(file).then((rows) => {
     rows.forEach((row, index) => {
       if (index === 0) return
-      // row 1,5,6-9
       const question = row[1].toString()
       const answer = row[5].toString()
       const options: string[] = []
@@ -86,7 +91,9 @@ async function getAnswer() {
     shouldExit = true
     return
   }
+
   getQO()
+
   const fuse = new Fuse(data.value, {
     keys: ['question']
   });
@@ -95,10 +102,29 @@ async function getAnswer() {
     nextButton.value!.click()
     return
   }
-  answer.value = result[0].item.answer
-  const answerList: Answer[] = result[0].item.answer.split('') as Answer[]
-  for (let item of answerList) {
-    await clickAnswer(item)
+
+  dbAnswer.value = result[0].item.answer
+  const dbAnswerList: Answer[] = result[0].item.answer.split('') as Answer[]
+
+  const dbRealAnswerList = convertOptionToAnswer(optionList.value, dbAnswerList)
+  console.log(dbRealAnswerList);
+
+  try {
+    for (let item of dbRealAnswerList) {
+      const fuse = new Fuse(optionList.value, {
+        keys: ['value']
+      });
+      const result = fuse.search(item)
+      if (!result) {
+        nextButton.value!.click()
+        return
+      }
+      await clickAnswer(result[0].refIndex)
+    }
+  }
+  catch {
+    nextButton.value!.click()
+    return
   }
 
   if (autoSubmit.value) {
@@ -122,9 +148,16 @@ async function getAnswer() {
   })
 }
 
-async function clickAnswer(answer: Answer) {
+function convertOptionToAnswer(options: string[], option: Answer[]): string[] {
+  const answerStringList: string[] = []
+  for (let item of option) {
+    answerStringList.push(options[answerToIndex[item]])
+  }
+  return answerStringList
+}
+
+async function clickAnswer(index: number) {
   try {
-    const index = answerToIndex[answer]
     optionsRef.value![index].click()
     await new Promise((resolve) => {
       setTimeout(() => {
